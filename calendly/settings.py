@@ -29,7 +29,7 @@ INSTALLED_APPS = [
     'django.contrib.staticfiles',
     'rest_framework',
     'corsheaders',
-    'availablity'
+    'schedule'
 ]
 
 REST_FRAMEWORK = {
