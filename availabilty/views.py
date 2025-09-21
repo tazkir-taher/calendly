@@ -51,11 +51,9 @@ def getDailySchedule(request):
         return Response({"code": 400,
                         "error": "Invalid date format, use YYYY-MM-DD"})
 
-    # Assume whole day available initially
     available = True
     time_slots = [{"start_time": "00:00", "end_time": "23:59"}]
 
-    # ---- recurring unavailable weekdays ----
     recurring_entry = Days.objects.filter(user=user, is_recurring=True).first()
     if recurring_entry:
         if recurring_entry.unavailable_days:
@@ -65,13 +63,10 @@ def getDailySchedule(request):
 
             weekday_name = target_date.strftime("%A").lower()
             if weekday_name in recurring_days:
-                # Fully unavailable
                 return Response({"date": str(target_date), "available": False, "time_slots": []})
 
-        # Partial unavailable times for recurring
         recurring_times = recurring_entry.times.all()
         if recurring_times:
-            # Build available slots by inverting unavailable times
             time_slots = []
             current_start = datetime.time(0, 0)
             for t in recurring_times:
@@ -81,16 +76,13 @@ def getDailySchedule(request):
             if current_start < datetime.time(23, 59):
                 time_slots.append({"start_time": str(current_start), "end_time": "23:59"})
 
-    # ---- specific day ----
     specific_entry = Days.objects.filter(user=user, is_recurring=False, day=target_date).first()
     if specific_entry:
         if not specific_entry.times.exists():
-            # Fully unavailable
             return Response({"date": str(target_date),
                             "available": False,
                             "time_slots": []})
         else:
-            # Partial unavailable
             unavailable_times = specific_entry.times.all()
             time_slots = []
             current_start = datetime.time(0, 0)
@@ -144,7 +136,7 @@ def getMonthlySchedule(request):
     for entry in specific_entries:
         if entry.day not in unavailable_dates:
             unavailable_dates.append(entry.day)
-    
+
     unavailable_dates.sort()
 
     str_dates = []
