@@ -80,6 +80,10 @@ def getDailySchedule(request):
         return Response({"code": 400,
                          "error": "Invalid date format, use YYYY-MM-DD"})
 
+    today = dt.today().date()
+    if target_date < today:
+        return Response({"date": str(target_date), "available": False, "time_slots": []})
+
     unavailable_times = []
 
     recurring_entry = Days.objects.filter(user=user, is_recurring=True).first()
@@ -97,7 +101,11 @@ def getDailySchedule(request):
 
     available_slots = get_available_slots(unavailable_times)
 
-    return Response({"date": str(target_date), "available": len(available_slots) > 0, "time_slots": available_slots})
+    return Response({
+                    "date": str(target_date),
+                    "available": len(available_slots) > 0,
+                    "time_slots": available_slots
+                     })
 
 @api_view(["GET"])
 @permission_classes([IsAuthenticated])
@@ -108,6 +116,9 @@ def getMonthlySchedule(request):
 
     first_weekday, num_days = calendar.monthrange(year, month)
     all_dates = [dt(year, month, day).date() for day in range(1, num_days + 1)]
+
+    today = dt.today().date()
+    all_dates = [date for date in all_dates if date >= today]
 
     available_dates = []
 
