@@ -57,6 +57,14 @@ def get_available_slots(unavailable_times):
         slots.append({"start_time": str(current), "end_time": "23:59"})
     return slots
 
+def apply_specific_unavailable(day_obj, specific_unavailable_times):
+    current_unavailable = [{"start": t.start_time, "end": t.end_time} for t in day_obj.times.all()]
+    new_unavailable = [{"start": time_from_str(t["start_time"]), "end": time_from_str(t["end_time"])} for t in specific_unavailable_times]
+    merged = merge_intervals(current_unavailable + new_unavailable)
+    day_obj.times.all().delete()
+    for interval in merged:
+        Time.objects.create(day=day_obj, start_time=interval["start"], end_time=interval["end"])
+
 @api_view(["GET"])
 @permission_classes([IsAuthenticated])
 def getDailySchedule(request):
@@ -140,6 +148,7 @@ def createSchedule(request):
     available_recurring = data.get("recurring_days", [])
     available_specific = data.get("specific_days", [])
     unavailable_dates = data.get("unavailable_dates", [])
+    specific_unavailable = data.get("specific_unavailable", [])
 
     all_weekdays = list(WEEKDAY_MAP.keys())
     if available_recurring:
@@ -169,6 +178,10 @@ def createSchedule(request):
         day_obj, _ = Days.objects.get_or_create(user=user, day=target_date, is_recurring=False)
         day_obj.times.all().delete()
 
+        if d.get("unavailable", False):
+            Time.objects.create(day=day_obj, start_time=time(0,0), end_time=time(23,59))
+            continue
+
         available_times = []
         for t in d.get("times", []):
             start = time_from_str(t["start_time"])
@@ -185,6 +198,25 @@ def createSchedule(request):
         day_obj.times.all().delete()
         Time.objects.create(day=day_obj, start_time=time(0,0), end_time=time(23,59))
 
+    for entry in specific_unavailable:
+        date_str = entry.get("date")
+        if not date_str:
+            continue
+        target_date = dt.strptime(date_str, "%Y-%m-%d").date()
+        day_obj, created = Days.objects.get_or_create(user=user, day=target_date, is_recurring=False)
+
+        if created or not day_obj.times.exists():
+            recurring_entry = Days.objects.filter(user=user, is_recurring=True).first()
+            if recurring_entry:
+                weekday_name = target_date.strftime("%A").lower()
+                recurring_days = [d.strip().lower() for d in recurring_entry.unavailable_days.split(",")] if recurring_entry.unavailable_days else []
+
+                if weekday_name not in recurring_days:
+                    for t in recurring_entry.times.all():
+                        Time.objects.create(day=day_obj, start_time=t.start_time, end_time=t.end_time)
+
+        apply_specific_unavailable(day_obj, entry.get("times", []))
+
     return Response({"code": 200, 
                     "success": True,
                     "message": "Schedule saved successfully"
@@ -199,6 +231,7 @@ def editSchedule(request):
     available_recurring = data.get("recurring_days", [])
     available_specific = data.get("specific_days", [])
     unavailable_dates = data.get("unavailable_dates", [])
+    specific_unavailable = data.get("specific_unavailable", [])
 
     if available_recurring:
         day_obj, _ = Days.objects.get_or_create(user=user, is_recurring=True)
@@ -247,6 +280,28 @@ def editSchedule(request):
         day_obj, _ = Days.objects.get_or_create(user=user, day=target_date, is_recurring=False)
         day_obj.times.all().delete()
         Time.objects.create(day=day_obj, start_time=time(0,0), end_time=time(23,59))
+
+    for entry in specific_unavailable:
+        date_str = entry.get("date")
+        if not date_str:
+            continue
+        target_date = dt.strptime(date_str, "%Y-%m-%d").date()
+        day_obj, created = Days.objects.get_or_create(user=user, day=target_date, is_recurring=False)
+
+        if created or not day_obj.times.exists():
+            recurring_entry = Days.objects.filter(user=user, is_recurring=True).first()
+            if recurring_entry:
+                weekday_name = target_date.strftime("%A").lower()
+                if recurring_entry.unavailable_days:
+                    recurring_days = [d.strip().lower() for d in recurring_entry.unavailable_days.split(",")]
+                else:
+                    recurring_days = []
+
+                if weekday_name not in recurring_days:
+                    for t in recurring_entry.times.all():
+                        Time.objects.create(day=day_obj, start_time=t.start_time, end_time=t.end_time)
+
+        apply_specific_unavailable(day_obj, entry.get("times", []))
 
     return Response({"code": 200,
                      "success": True,
