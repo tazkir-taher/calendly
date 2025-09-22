@@ -195,7 +195,7 @@ def createSchedule(request):
         for day_name in all_weekdays:
             found = next((d for d in available_recurring if d["day"].lower() == day_name), None)
 
-            day_obj = Days.objects.create(user=user, is_recurring=True, day=None, unavailable_days="" if found else day_name)
+            day_obj = Days.objects.create(user=user, is_recurring=True, day=None, available_recurring_days= day_name if found else "")
 
             if found:
                 start_time = time_from_str(found["start_time"])
