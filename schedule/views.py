@@ -100,16 +100,16 @@ def getDailySchedule(request):
     weekday_name = target_date.strftime("%A").lower()
 
     repeating_entries = Days.objects.filter(user=user, is_repeating=True)
-    found_today = False
+    found_day = False
 
     for entry in repeating_entries:
         entry_days = []
         if entry.available_repeating_days:
             entry_days = [d.strip().lower() for d in entry.available_repeating_days.split(",")]
         if weekday_name in entry_days:
-            found_today = True
+            found_day = True
             unavailable_times.extend(entry.times.all())
-    if not found_today:
+    if not found_day:
         unavailable_times.append(Time(start_time=time(0,0), end_time=time(23,59)))
 
     specific_entry = Days.objects.filter(user=user, is_repeating=False, day=target_date).first()
@@ -147,16 +147,16 @@ def getMonthlySchedule(request):
 
         unavailable_times = []
         weekday_name = date.strftime("%A").lower()
-        found_today = False
+        found_day = False
 
         for entry in repeating_entries:
             if entry.available_repeating_days:
                 entry_days = [d.strip().lower() for d in entry.available_repeating_days.split(",")]
                 if weekday_name in entry_days:
-                    found_today = True
+                    found_day = True
                     unavailable_times.extend(entry.times.all())
 
-        if not found_today:
+        if not found_day:
             unavailable_times.append(Time(start_time=time(0,0), end_time=time(23,59)))
 
         specific_entry = Days.objects.filter(user=user, is_repeating=False, day=date).first()
