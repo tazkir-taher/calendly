@@ -108,16 +108,17 @@ def getDailySchedule(request):
     recurring_entries = Days.objects.filter(user=user, is_recurring=True)
     for entry in recurring_entries:
         recurring_days = []
-        if entry.unavailable_days:
-            for d in entry.unavailable_days.split(","):
+        if entry.available_recurring_days:
+            for d in entry.available_recurring_days.split(","):
                 recurring_days.append(d.strip().lower())
         
         if weekday_name in recurring_days:
-            unavailable_times.append(Time(start_time=time(0,0), end_time=time(23,59)))
-        
-        else:
             for t in entry.times.all():
                 unavailable_times.append(t)
+        
+        # else:
+        #     for t in entry.times.all():
+        #         unavailable_times.append(t)
 
     specific_entry = Days.objects.filter(user=user, is_recurring=False, day=target_date).first()
     if specific_entry:
