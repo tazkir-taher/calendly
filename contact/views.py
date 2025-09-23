@@ -42,7 +42,6 @@ def apply_specific_unavailable(day_obj, specific_unavailable_times):
     for interval in merged:
         Time.objects.create(day=day_obj, start_time=interval["start"], end_time=interval["end"])
 
-# ---------- GET ALL MEETINGS ----------
 @api_view(['GET'])
 @permission_classes([IsAuthenticated])
 def meetingList(request):
@@ -62,7 +61,6 @@ def meetingList(request):
             'error': str(e)
         })
 
-# ---------- GET SINGLE MEETING ----------
 @api_view(['GET'])
 @permission_classes([IsAuthenticated])
 def meetingDetail(request, pk):
@@ -80,7 +78,6 @@ def meetingDetail(request, pk):
             'response': "Meeting not found"
         })
 
-# ---------- CREATE MEETING ----------
 @api_view(['POST'])
 @permission_classes([IsAuthenticated])
 def meetingCreate(request):
@@ -88,7 +85,6 @@ def meetingCreate(request):
         user = request.user
         serializer = MeetingSerializer(data=request.data)
         if serializer.is_valid():
-            # Set default active to False
             serializer.save(user=user, active=False)
             return Response({
                 'code': status.HTTP_200_OK,
@@ -107,7 +103,6 @@ def meetingCreate(request):
             'error': str(e)
         })
 
-# ---------- DELETE MEETING ----------
 @api_view(['DELETE'])
 @permission_classes([IsAuthenticated])
 def meetingDelete(request, pk):
@@ -124,32 +119,28 @@ def meetingDelete(request, pk):
             'response': "Meeting not found"
         })
 
-# ---------- TOGGLE MEETING ACTIVE STATUS ----------
 @api_view(['GET'])
 @permission_classes([IsAuthenticated])
 def meetingToggle(request, pk):
-    """
-    Toggle the active status of a meeting and mark the unavailable time in schedule.
-    Works with a GET request.
-    """
     try:
         meeting = Meeting.objects.get(id=pk, user=request.user)
 
-        # Toggle the active flag
-        meeting.active = not meeting.active
-        meeting.save()
+        if not meeting.active:
+            meeting.active = True
+            meeting.save()
+        else:
+            meeting.delete()
+            return Response({
+                'code': status.HTTP_200_OK,
+                'response': "deleted, since active=False"
+            })
 
-        # Only update schedule if meeting is active and has start/end times
         if meeting.active and meeting.start_time and meeting.end_time:
-            # Use the saved day, fallback to today
             target_date = meeting.day if meeting.day else date.today()
             weekday_name = target_date.strftime("%A").lower()
 
-            # Fetch repeating day template
-            repeating_day = Days.objects.filter(user=request.user, is_repeating=True,
-                                                available_repeating_days__icontains=weekday_name).first()
+            repeating_day = Days.objects.filter(user=request.user, is_repeating=True,  available_repeating_days__icontains=weekday_name).first()
 
-            # Create day object or copy template times
             if repeating_day:
                 day_obj, created = Days.objects.get_or_create(user=request.user, day=target_date, is_repeating=False)
                 if created or not day_obj.times.exists():
@@ -158,15 +149,11 @@ def meetingToggle(request, pk):
             else:
                 day_obj, created = Days.objects.get_or_create(user=request.user, day=target_date, is_repeating=False)
 
-            # Apply the meeting's unavailable interval
-            apply_specific_unavailable(day_obj, [{
-                "start_time": meeting.start_time.strftime("%H:%M"),
-                "end_time": meeting.end_time.strftime("%H:%M")
-            }])
+            apply_specific_unavailable(day_obj, [{"start_time": meeting.start_time.strftime("%H:%M"), "end_time": meeting.end_time.strftime("%H:%M")}])
 
         return Response({
             'code': status.HTTP_200_OK,
-            'response': f"Meeting {'activated' if meeting.active else 'deactivated'} successfully",
+            'response': "Meeting approved successfully",
             "active": meeting.active
         })
 
