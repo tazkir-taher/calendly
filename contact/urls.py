@@ -1,11 +1,12 @@
 from django.urls import path
 from . import views
 
-app_name = 'profile_contact'
+app_name = 'contact'
 
 urlpatterns = [
-    path('', views.profileContactList, name='ProfileContact-list'),
-    path('detail/<int:pk>', views.profileContactDetail, name='ProfileContact-detail'),
-    path('create', views.profileContactCreate, name='ProfileContact-create'),
-    path('delete/<int:pk>', views.profileContactDelete, name='ProfileContact-delete'),
+    path('', views.meetingList, name='meeting-list'),
+    path('detail/<int:pk>', views.meetingDetail, name='meeting-detail'),
+    path('create', views.meetingCreate, name='meeting-create'),
+    path('delete/<int:pk>', views.meetingDelete, name='meeting-delete'),
+    path('toggle/<int:pk>', views.meetingToggle, name='meeting-toggle'),
 ]
