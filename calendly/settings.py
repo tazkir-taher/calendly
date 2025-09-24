@@ -30,7 +30,7 @@ INSTALLED_APPS = [
     'rest_framework',
     'corsheaders',
     'schedule',
-    'contact'
+    'meeting'
 ]
 
 REST_FRAMEWORK = {

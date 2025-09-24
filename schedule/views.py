@@ -264,7 +264,6 @@ def getMonthlyScheduleOpen(request, pk):
         weekday_name = date.strftime("%A").lower()
         found_day = False
 
-        # Repeating entries
         for entry in repeating_entries:
             if entry.available_repeating_days:
                 entry_days = [d.strip().lower() for d in entry.available_repeating_days.split(",")]
@@ -275,7 +274,6 @@ def getMonthlyScheduleOpen(request, pk):
         if not found_day:
             unavailable_times.append(Time(start_time=time(0, 0), end_time=time(23, 59)))
 
-        # Specific date override
         specific_entry = Days.objects.filter(user=user, is_repeating=False, day=date).first()
         if specific_entry:
             unavailable_times = list(specific_entry.times.all())
