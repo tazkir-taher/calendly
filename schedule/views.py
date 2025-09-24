@@ -414,12 +414,12 @@ def editSchedule(request):
         if day_name not in all_weekdays:
             continue
 
-        day_obj = Days.objects.filter(user=user, is_repeating=True, available_repeating_days__icontains=day_name).first()
+        day_obj = Days.objects.filter( user=user, is_repeating=True, available_repeating_days__icontains=day_name).first()
         if not day_obj:
             day_obj = Days.objects.create(user=user, is_repeating=True, day=None, available_repeating_days=day_name)
 
-        day_obj.times.all().delete()
-
+        day_obj.schedule_times.all().delete()
+        
         start_time = time_from_str(day_data["start_time"])
         end_time = time_from_str(day_data["end_time"])
         intervals = calculate_unavailable_intervals([{"start": start_time, "end": end_time}])
@@ -431,70 +431,40 @@ def editSchedule(request):
         if not date_str:
             continue
         target_date = dt.strptime(date_str, "%Y-%m-%d").date()
-        weekday_name = target_date.strftime("%A").lower()
 
-        repeating_day = Days.objects.filter(user=user, is_repeating=True, available_repeating_days__icontains=weekday_name).first()
-        non_repeating_day = Days.objects.filter(user=user, is_repeating=False, day=target_date).first()
-        if repeating_day:
-            day_obj, created = Days.objects.get_or_create(user=user, day=target_date, is_repeating=False)
-            if created or not day_obj.times.exists():
-                for t in repeating_day.times.all():
-                    Time.objects.create(day=day_obj, start_time=t.start_time, end_time=t.end_time)
-        elif non_repeating_day:
-            day_obj , created = Days.objects.get_or_create(user=user, day=target_date, is_repeating=False)
-        else:
-            day_obj, created = Days.objects.get_or_create(user=user, day=target_date, is_repeating=False)
-
-        day_obj.times.all().delete()
+        day_obj, created = Days.objects.get_or_create(user=user, day=target_date, is_repeating=False)
 
         if specific_day.get("unavailable", False):
-            Time.objects.create(day=day_obj, start_time=time(0,0), end_time=time(23,59))
+            apply_specific_unavailable(day_obj, [{"start_time": "00:00", "end_time": "23:59"}])
             continue
 
-        available_times = []
-        for t in specific_day.get("times", []):
-            start = time_from_str(t["start_time"])
-            end = time_from_str(t["end_time"])
-            available_times.append({"start": start, "end": end})
+        new_intervals = [
+            {"start": time_from_str(t["start_time"]), "end": time_from_str(t["end_time"])}
+            for t in specific_day.get("times", [])
+        ]
 
-        intervals = calculate_unavailable_intervals(available_times)
-        for interval in intervals:
+        existing_intervals = [
+            {"start": t.start_time, "end": t.end_time} for t in day_obj.schedule_times.all()
+        ]
+        merged_intervals = merge_intervals(existing_intervals + new_intervals)
+
+        day_obj.schedule_times.all().delete()
+        for interval in merged_intervals:
             Time.objects.create(day=day_obj, start_time=interval["start"], end_time=interval["end"])
 
     for date_str in unavailable_dates:
         if not date_str:
             continue
         target_date = dt.strptime(date_str, "%Y-%m-%d").date()
-        weekday_name = target_date.strftime("%A").lower()
-
-        repeating_day = Days.objects.filter(user=user, is_repeating=True, available_repeating_days__icontains=weekday_name).first()
-        if repeating_day:
-            day_obj, created = Days.objects.get_or_create(user=user, day=target_date, is_repeating=False)
-            if created or not day_obj.times.exists():
-                for t in repeating_day.times.all():
-                    Time.objects.create(day=day_obj, start_time=t.start_time, end_time=t.end_time)
-        else:
-            day_obj, created = Days.objects.get_or_create(user=user, day=target_date, is_repeating=False)
-
-        day_obj.times.all().delete()
-        Time.objects.create(day=day_obj, start_time=time(0,0), end_time=time(23,59))
+        day_obj, created = Days.objects.get_or_create(user=user, day=target_date, is_repeating=False)
+        apply_specific_unavailable(day_obj, [{"start_time": "00:00", "end_time": "23:59"}])
 
     for entry in specific_unavailable:
         date_str = entry.get("date")
         if not date_str:
             continue
         target_date = dt.strptime(date_str, "%Y-%m-%d").date()
-        weekday_name = target_date.strftime("%A").lower()
-
-        repeating_day = Days.objects.filter(user=user, is_repeating=True, available_repeating_days__icontains=weekday_name).first()
-        if repeating_day:
-            day_obj, created = Days.objects.get_or_create(user=user, day=target_date, is_repeating=False)
-            if created or not day_obj.times.exists():
-                for t in repeating_day.times.all():
-                    Time.objects.create(day=day_obj, start_time=t.start_time, end_time=t.end_time)
-        else:
-            day_obj, created = Days.objects.get_or_create(user=user, day=target_date, is_repeating=False)
-
+        day_obj, created = Days.objects.get_or_create(user=user, day=target_date, is_repeating=False)
         apply_specific_unavailable(day_obj, entry.get("times", []))
 
     return Response({

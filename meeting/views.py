@@ -79,13 +79,16 @@ def meetingDetail(request, pk):
         })
 
 @api_view(['POST'])
-@permission_classes([IsAuthenticated])
 def meetingCreate(request):
     try:
-        user = request.user
+        user_id = request.data.get('id', None)
+        if user_id:
+            user_instance = User.objects.get(id=user_id)
+        else:
+            user_instance = None
         serializer = MeetingSerializer(data=request.data)
         if serializer.is_valid():
-            serializer.save(user=user, active=False)
+            serializer.save(user=user_instance, active=False)
             return Response({
                 'code': status.HTTP_200_OK,
                 'response': "Meeting created successfully",
@@ -128,12 +131,6 @@ def meetingToggle(request, pk):
         if not meeting.active:
             meeting.active = True
             meeting.save()
-        else:
-            meeting.delete()
-            return Response({
-                'code': status.HTTP_200_OK,
-                'response': "deleted, since active=False"
-            })
 
         if meeting.active and meeting.start_time and meeting.end_time:
             target_date = meeting.day if meeting.day else date.today()
